@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Manga Comic Chess</title>
+<style>
+:root{--bg:#f4efe6;--light:#ffffff;--dark:#000000;--panel:#fff;--text:#111;--accent:#ff3366;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#f4efe6}}
+*{box-sizing:border-box;user-select:none;-webkit-user-select:none;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Impact','Comic Sans MS','Chalkboard SE',sans-serif;background:var(--bg);color:var(--text);display:flex;justify-content:center;overflow:hidden}
+#app{width:100%;max-width:480px;height:100%;display:flex;flex-direction:column;justify-content:space-between;padding:10px;position:relative}
+.panel{background:var(--panel);border:3px solid #000;border-radius:12px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;box-shadow:4px 4px 0 #000}
+.pname{font-size:1.1rem;text-transform:uppercase;letter-spacing:1px}
+.cap{font-size:1.2rem;min-height:26px;line-height:1.1}
+.timer{font-size:1.6rem;background:#000;color:#fff;padding:4px 8px;border-radius:6px;min-width:80px;text-align:center}
+.active-turn .timer{background:var(--accent);animation:pulse 1s infinite alternate}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.05)}}
+#board-wrap{position:relative;width:100%;aspect-ratio:1;border:4px solid #000;border-radius:8px;overflow:hidden;box-shadow:6px 6px 0 #000;background:#000}
+#board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:100%;height:100%}
+.sq{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.sq.light{background:var(--light)}.sq.dark{background:var(--dark)}
+.sq.selected{background:#ffeb3b!important}
+.sq.hl::after{content:'';position:absolute;width:30%;height:30%;background:rgba(0,200,83,.85);border-radius:50%;border:2px solid #000}
+.sq.hlc::after{content:'';position:absolute;inset:6%;border:4px dashed #ff1744;border-radius:50%}
+.pc{width:94%;height:94%;pointer-events:none;filter:drop-shadow(1px 2px 1px rgba(0,0,0,.35))}
+.pc.bk{filter:drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1px #fff)}
+#start{position:absolute;inset:0;background:rgba(255,255,255,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;gap:15px}
+.btn{background:#ffeb3b;color:#000;font-family:inherit;font-size:1.3rem;padding:10px 22px;border:4px solid #000;border-radius:12px;box-shadow:4px 4px 0 #000;cursor:pointer;text-transform:uppercase}
+.btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 #000}
+.ibtn{background:#fff;color:#000;font-family:inherit;border:3px solid #000;border-radius:8px;padding:6px 10px;cursor:pointer;box-shadow:2px 2px 0 #000;font-size:.85rem}
+.ibtn.on{background:#ffeb3b}
+#head{display:flex;justify-content:space-between;gap:8px}
+.modal{position:absolute;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;padding:8px;z-index:20}
+.modal.open{display:flex}
+.mc{background:#fff;border:4px solid #000;border-radius:16px;padding:14px;width:100%;max-width:460px;box-shadow:6px 6px 0 #000;display:flex;flex-direction:column;gap:10px;max-height:98%;overflow-y:auto}
+.fg{display:flex;flex-direction:column;gap:3px}
+.fg label{font-size:.85rem;text-transform:uppercase}
+.fg input,.fg select{padding:7px;border:2px solid #000;border-radius:6px;font-family:inherit;font-size:1rem}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center}
+#cv{width:100%;aspect-ratio:1;border:3px solid #000;border-radius:8px;touch-action:none;cursor:crosshair;background:repeating-conic-gradient(#e8e8e8 0 25%,#fff 0 50%) 0 0/24px 24px}
+.sw{width:30px;height:30px;border-radius:50%;border:3px solid #000;cursor:pointer;padding:0}
+.sw.on{outline:3px solid var(--accent);outline-offset:1px}
+input[type=color]{width:38px;height:34px;border:3px solid #000;border-radius:8px;padding:0;background:#fff}
+input[type=range]{flex:1;min-width:120px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="head">
+    <button class="ibtn" onclick="openModal('settings')">⚙️ EINSTELLUNGEN</button>
+    <button class="ibtn" onclick="openModal('studio')">🎨 ZEICHEN-STUDIO</button>
+  </div>
+  <div class="panel" id="panel-b">
+    <div><div class="pname" id="name-b">SCHWARZ (KI)</div><div class="cap" id="cap-b"></div></div>
+    <div class="timer" id="timer-b">05:00</div>
+  </div>
+  <div id="board-wrap">
+    <div id="board"></div>
+    <div id="start">
+      <h1 style="font-size:2.2rem;text-shadow:3px 3px 0 #ffeb3b;text-align:center">COMIC CHESS</h1>
+      <button class="btn" onclick="startGame()">▶ SPIEL STARTEN</button>
+    </div>
+  </div>
+  <div class="panel" id="panel-w">
+    <div><div class="pname" id="name-w">WEISS</div><div class="cap" id="cap-w"></div></div>
+    <div class="timer" id="timer-w">05:00</div>
+  </div>
+</div>
+
+<div class="modal" id="settings"><div class="mc">
+  <h2>⚙️ EINSTELLUNGEN</h2>
+  <div class="fg"><label>Spieler 1 (Weiß)</label><input id="in-w" value="Spieler 1"></div>
+  <div class="fg"><label>Spieler 2 (Schwarz)</label><input id="in-b" value="Computer"></div>
+  <div class="fg"><label>Spielmodus</label><select id="mode"><option value="pvp">2 Spieler (Lokal)</option><option value="ai" selected>Gegen Computer (KI)</option></select></div>
+  <div class="fg"><label>Figuren-Set</label><select id="style" onchange="pieceStyle=this.value;renderBoard()"><option value="classic" selected>Klassisch</option><option value="smiley">😀 Smileys</option><option value="minecraft">⛏️ Minecraft</option><option value="custom">🎨 Eigene Zeichnung</option></select></div>
+  <div class="fg"><label>Bedenkzeit (Minuten)</label><input type="number" id="in-time" value="5" min="1" max="60"></div>
+  <div class="fg"><label>Fischer-Bonus (Sek. / Zug)</label><input type="number" id="in-inc" value="3" min="0" max="30"></div>
+  <button class="btn" onclick="saveSettings()">SPEICHERN &amp; NEUSTART</button>
+  <button class="ibtn" onclick="closeModal('settings')">SCHLIESSEN</button>
+</div></div>
+
+<div class="modal" id="studio"><div class="mc">
+  <h2>🎨 ZEICHEN-STUDIO</h2>
+  <div class="row">
+    <select id="sp" class="ibtn" onchange="loadSketch()">
+      <option value="p">Bauer</option><option value="n">Springer</option><option value="b">Läufer</option>
+      <option value="r">Turm</option><option value="q">Dame</option><option value="k">König</option>
+    </select>
+    <select id="sd" class="ibtn" onchange="loadSketch()">
+      <option value="w">Seite: Weiß</option><option value="b">Seite: Schwarz</option>
+    </select>
+  </div>
+  <canvas id="cv" width="480" height="480"></canvas>
+  <div class="row" id="swatches"></div>
+  <div class="row">
+    <input type="color" id="col" value="#000000" oninput="setColor(this.value)">
+    <input type="range" id="size" min="2" max="48" value="10" oninput="sizeLbl.textContent=this.value+' px'">
+    <span id="sizeLbl" style="min-width:48px">10 px</span>
+  </div>
+  <div class="row">
+    <button class="ibtn on" id="t-draw" onclick="setTool('draw')">✏️ Stift</button>
+    <button class="ibtn" id="t-erase" onclick="setTool('erase')">🧽 Radierer</button>
+    <button class="ibtn" onclick="undo()">↩️ Zurück</button>
+    <button class="ibtn" onclick="clearCv()">🗑️ Leeren</button>
+  </div>
+  <p style="font-size:.75rem;text-align:center">Gespeicherte Figuren werden beim Auswählen geladen und können weiter bearbeitet werden. Ohne eigene Schwarz-Version wird die weiße automatisch invertiert.</p>
+  <button class="btn" onclick="saveSketch()">FIGUR SPEICHERN</button>
+  <div class="row">
+    <button class="ibtn" onclick="removeSketch()">❌ Zeichnung entfernen</button>
+    <button class="ibtn" onclick="closeModal('studio')">SCHLIESSEN</button>
+  </div>
+</div></div>
+
+<script>
+let board=[],turn='w',sel=null,moves=[],active=false,timer=null,timeW=300,timeB=300,inc=3,mode='ai',pieceStyle='classic';
+let capW=[],capB=[],sketches={};
+const START=['rnbqkbnr','pppppppp','........','........','........','........','PPPPPPPP','RNBQKBNR'];
+const GLYPH={p:'♟',n:'♞',b:'♝',r:'♜',q:'♛',k:'♚'};
+const KEY='manga_chess_sketches_v2';
+const isW=p=>p===p.toUpperCase();
+
+function initBoard(){
+  board=START.map(r=>[...r].map(c=>c==='.'?'':c));
+  turn='w';sel=null;moves=[];capW=[];capB=[];
+  updateCaptured();updateActive();renderBoard();
+}
+function renderBoard(){
+  const el=document.getElementById('board');el.innerHTML='';
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    const s=document.createElement('div');
+    s.className='sq '+((r+c)%2===0?'light':'dark');
+    if(sel&&sel.r===r&&sel.c===c)s.classList.add('selected');
+    if(moves.some(m=>m.r===r&&m.c===c))s.classList.add(board[r][c]?'hlc':'hl');
+    if(board[r][c])s.appendChild(pieceEl(board[r][c]));
+    s.onclick=()=>clickSq(r,c);
+    el.appendChild(s);
+  }
+}
+function clickSq(r,c){
+  if(!active||(mode==='ai'&&turn==='b'))return;
+  const p=board[r][c];
+  if(p&&isW(p)===(turn==='w')){sel={r,c};moves=validMoves(r,c,board);renderBoard();return}
+  if(sel){
+    if(moves.some(m=>m.r===r&&m.c===c))execMove(sel.r,sel.c,r,c);
+    else{sel=null;moves=[];renderBoard()}
+  }
+}
+function execMove(fr,fc,tr,tc){
+  const a=board[fr][fc],d=board[tr][tc];
+  if(d){
+    (turn==='w'?capW:capB).push(d.toLowerCase());updateCaptured();
+    if(d.toLowerCase()==='k'){
+      board[tr][tc]=a;board[fr][fc]='';renderBoard();
+      endGame(document.getElementById(turn==='w'?'name-w':'name-b').innerText+' gewinnt, weil der König geschlagen wurde!');return;
+    }
+  }
+  board[tr][tc]=a;board[fr][fc]='';
+  if(a==='P'&&tr===0)board[tr][tc]='Q';
+  if(a==='p'&&tr===7)board[tr][tc]='q';
+  if(turn==='w')timeW+=inc;else timeB+=inc;
+  updateTimer();sel=null;moves=[];turn=turn==='w'?'b':'w';
+  updateActive();renderBoard();
+  if(mode==='ai'&&turn==='b'&&active)setTimeout(aiMove,600);
+}
+function validMoves(r,c,st){
+  const p=st[r][c];if(!p)return[];
+  const w=isW(p),t=p.toLowerCase(),out=[];
+  const enemy=x=>x&&(w?x===x.toLowerCase():x===x.toUpperCase());
+  const inb=(a,b)=>a>=0&&a<8&&b>=0&&b<8;
+  const R=[[-1,0],[1,0],[0,-1],[0,1]],B=[[-1,-1],[-1,1],[1,-1],[1,1]];
+  const N=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+  if(t==='p'){
+    const d=w?-1:1,sr=w?6:1;
+    if(inb(r+d,c)&&st[r+d][c]===''){
+      out.push({r:r+d,c});
+      if(r===sr&&st[r+2*d][c]==='')out.push({r:r+2*d,c});
+    }
+    [-1,1].forEach(dc=>{if(inb(r+d,c+dc)&&enemy(st[r+d][c+dc]))out.push({r:r+d,c:c+dc})});
+  }else if(t==='n'||t==='k'){
+    (t==='n'?N:[...R,...B]).forEach(([dr,dc])=>{
+      const nr=r+dr,nc=c+dc;
+      if(inb(nr,nc)&&(st[nr][nc]===''||enemy(st[nr][nc])))out.push({r:nr,c:nc});
+    });
+  }else{
+    (t==='r'?R:t==='b'?B:[...R,...B]).forEach(([dr,dc])=>{
+      let nr=r+dr,nc=c+dc;
+      while(inb(nr,nc)){
+        if(st[nr][nc]===''){out.push({r:nr,c:nc})}
+        else{if(enemy(st[nr][nc]))out.push({r:nr,c:nc});break}
+        nr+=dr;nc+=dc;
+      }
+    });
+  }
+  return out;
+}
+function aiMove(){
+  if(!active)return;
+  const all=[];
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++)
+    if(board[r][c]&&!isW(board[r][c]))validMoves(r,c,board).forEach(m=>all.push({f:{r,c},t:m}));
+  if(!all.length)return;
+  const caps=all.filter(m=>board[m.t.r][m.t.c]);
+  const pool=caps.length?caps:all;
+  const m=pool[Math.floor(Math.random()*pool.length)];
+  execMove(m.f.r,m.f.c,m.t.r,m.t.c);
+}
+function startGame(){
+  document.getElementById('start').style.display='none';
+  active=true;initBoard();
+  if(timer)clearInterval(timer);
+  timer=setInterval(()=>{
+    if(!active)return;
+    if(turn==='w'){if(--timeW<=0)endGame('Schwarz gewinnt nach Zeit!')}
+    else if(--timeB<=0)endGame('Weiß gewinnt nach Zeit!');
+    updateTimer();
+  },1000);
+  updateTimer();
+}
+function endGame(msg){
+  active=false;clearInterval(timer);
+  document.getElementById('start').style.display='flex';
+  setTimeout(()=>alert('SPIEL ENDE!\n'+msg),50);
+}
+function updateTimer(){
+  const f=s=>String(Math.floor(Math.max(s,0)/60)).padStart(2,'0')+':'+String(Math.max(s,0)%60).padStart(2,'0');
+  document.getElementById('timer-w').innerText=f(timeW);
+  document.getElementById('timer-b').innerText=f(timeB);
+}
+function updateActive(){
+  document.getElementById('panel-w').classList.toggle('active-turn',turn==='w');
+  document.getElementById('panel-b').classList.toggle('active-turn',turn==='b');
+}
+function updateCaptured(){
+  document.getElementById('cap-w').innerText=capW.map(p=>GLYPH[p]).join(' ');
+  document.getElementById('cap-b').innerText=capB.map(p=>GLYPH[p]).join(' ');
+}
+
+/* --- Klassische Figuren: kräftige Silhouetten mit Umriss und Details --- */
+const SHAPES={
+  p:{o:'<circle cx="50" cy="28" r="12"/><path d="M38 84C38 64 44 58 44 48H56C56 58 62 64 62 84Z"/><rect x="35" y="44" width="30" height="8" rx="4"/>',d:''},
+  r:{o:'<path d="M30 84L35 42H65L70 84Z"/><path d="M27 42V19H39V27H45V19H55V27H61V19H73V42Z"/>',d:'<path d="M37 58H63"/>'},
+  b:{o:'<path d="M50 17C67 31 68 45 60 53H40C32 45 33 31 50 17Z"/><circle cx="50" cy="13" r="5"/><path d="M37 53H63L69 84H31Z"/>',d:'<path d="M50 28V42M44 35H56"/>'},
+  n:{o:'<path d="M28 84C30 64 42 58 45 47C39 47 33 51 27 57L20 50C25 38 33 26 45 20L48 9L57 18C75 24 76 54 73 84Z"/>',d:'<path d="M60 28C67 40 67 56 64 72"/><path d="M30 52L36 49"/><circle cx="51" cy="31" r="2.6" class="f"/>'},
+  q:{o:'<path d="M27 84L17 33L36 55L36 23L50 51L64 23L64 55L83 33L73 84Z"/><circle cx="17" cy="30" r="5"/><circle cx="36" cy="19" r="5"/><circle cx="64" cy="19" r="5"/><circle cx="83" cy="30" r="5"/>',d:'<path d="M31 70H69"/>'},
+  k:{o:'<path d="M32 84L28 56C28 44 40 40 50 40C60 40 72 44 72 56L68 84Z"/><path d="M45 7H55V14H63V23H55V40H45V23H37V14H45Z"/>',d:'<path d="M34 70H66"/>'}
+};
+function classicSVG(piece){
+  const w=isW(piece),t=piece.toLowerCase(),f=w?'#ffffff':'#454545',dt=w?'#000':'#fff';
+  const s=SHAPES[t];
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox','0 0 100 100');svg.classList.add('pc');
+  svg.innerHTML=`<g fill="${f}" stroke="#000" stroke-width="4" stroke-linejoin="round"><rect x="22" y="82" width="56" height="11" rx="5"/>${s.o}</g>`+
+    `<g fill="none" stroke="${dt}" stroke-width="3" stroke-linecap="round" style="--f:${dt}">${s.d.replace('class="f"',`fill="${dt}" stroke="none"`)}</g>`;
+  return svg;
+}
+/* --- Smiley-Modus --- */
+function smileySVG(piece){
+  const w=isW(piece),t=piece.toLowerCase(),face=w?'#ffd93b':'#8e6bd8',ink=w?'#000':'#fff';
+  let acc='',eyes=`<circle cx="38" cy="52" r="4.5" fill="${ink}"/><circle cx="62" cy="52" r="4.5" fill="${ink}"/>`;
+  let mouth=`<path d="M34 66Q50 80 66 66" fill="none" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>`;
+  const crown=(top)=>`<path d="M30 26L26 10L40 18L50 ${top}L60 18L74 10L70 26Z" fill="#f5c518" stroke="#000" stroke-width="3" stroke-linejoin="round"/>`;
+  if(t==='n')eyes='<path d="M26 50H74" stroke="#000" stroke-width="4"/><rect x="27" y="46" width="21" height="13" rx="4" fill="#000"/><rect x="52" y="46" width="21" height="13" rx="4" fill="#000"/>';
+  if(t==='b')acc='<ellipse cx="50" cy="12" rx="18" ry="5" fill="none" stroke="#f5a800" stroke-width="4"/>';
+  if(t==='r'){
+    mouth=`<path d="M32 64Q50 84 68 64Z" fill="#e53935" stroke="${ink}" stroke-width="3" stroke-linejoin="round"/>`;
+    acc='<path d="M28 26V10H38V16H45V10H55V16H62V10H72V26Z" fill="#9e9e9e" stroke="#000" stroke-width="3" stroke-linejoin="round"/>';
+  }
+  if(t==='q'){acc=crown(6);eyes+='<circle cx="27" cy="64" r="5" fill="#ff7aa8" opacity=".8"/><circle cx="73" cy="64" r="5" fill="#ff7aa8" opacity=".8"/>'}
+  if(t==='k'){
+    acc=crown(8)+'<path d="M47 0H53V5H58V10H53V15H47V10H42V5H47Z" fill="#f5c518" stroke="#000" stroke-width="2" stroke-linejoin="round"/>';
+    mouth='<path d="M50 64Q42 58 32 64Q40 71 50 67Q60 71 68 64Q58 58 50 64Z" fill="#5d3a1a"/>'+`<path d="M40 75Q50 83 60 75" fill="none" stroke="${ink}" stroke-width="3.5" stroke-linecap="round"/>`;
+  }
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox','0 0 100 100');svg.classList.add('pc');
+  svg.innerHTML=`<circle cx="50" cy="58" r="36" fill="${face}" stroke="#000" stroke-width="4"/>${eyes}${mouth}${acc}`;
+  return svg;
+}
+
+/* --- Minecraft-Modus (Pixel-Blöcke) --- */
+const MC={
+  p:['...oooo...','..occaao..','..oaaabo..','...oaabo..','....oabo..','...oaaabo.','..oaaaaabo','..oooooooo'],
+  r:['.oo.oo.oo.','.occaaaabo','.oaaaaaabo','..oaaaabo.','..oaaaabo.','..oaaaabo.','.oaaaaaabo','oooooooooo'],
+  b:['....oo....','...ocao...','..occaabo.','..oaxxabo.','..oaaxabo.','...oaaabo.','..oaaaaabo','oooooooooo'],
+  n:['..oo.oo...','.occoaaao.','.ocaaaaabo','ocaeaaaabo','oaaaaaaabo','ooaaaabbo.','..oaaaabo.','.oaaaaaabo','oooooooooo'],
+  q:['g.g.gg.g.g','occaaaaabo','.oaaaaaabo','..oaagaabo','..oaaaabo.','..oaaaabo.','.oaaaaaabo','oooooooooo'],
+  k:['....gg....','...gggg...','....gg....','.occaaaabo','.oaaggaabo','..oaaaabo.','..oaaaabo.','.oaaaaaabo','oooooooooo']
+};
+const MCC={
+  w:{o:'#2b2b2b',a:'#f2f2f2',b:'#b4b4b4',c:'#ffffff',x:'#6d6d6d',g:'#f5c518',e:'#000000'},
+  b:{o:'#000000',a:'#4a4a52',b:'#2a2a30',c:'#6b6b75',x:'#111111',g:'#f5c518',e:'#f5f5f5'}
+};
+function mcSVG(piece){
+  const col=MCC[isW(piece)?'w':'b'],rows=MC[piece.toLowerCase()];
+  const all=[...Array(10-rows.length).fill('..........'),...rows];
+  let h='';
+  all.forEach((row,y)=>[...row].forEach((ch,x)=>{
+    if(ch!=='.')h+=`<rect x="${x}" y="${y}" width="1.04" height="1.04" fill="${col[ch]}"/>`;
+  }));
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox','0 0 10 10');svg.setAttribute('shape-rendering','crispEdges');svg.classList.add('pc');
+  svg.innerHTML=h;
+  return svg;
+}
+
+function pieceEl(piece){
+  const el=pieceEl0(piece);
+  if(!isW(piece))el.classList.add('bk');
+  return el;
+}
+function pieceEl0(piece){
+  if(pieceStyle==='smiley')return smileySVG(piece);
+  if(pieceStyle==='minecraft')return mcSVG(piece);
+  if(pieceStyle==='custom'){
+    const own=sketches[piece],other=sketches[isW(piece)?piece.toLowerCase():piece.toUpperCase()];
+    const src=own||other;
+    if(src){
+      const img=document.createElement('img');img.src=src;img.className='pc';
+      if(!own)img.style.filter='invert(1) hue-rotate(180deg) drop-shadow(1px 2px 1px rgba(0,0,0,.35))';
+      return img;
+    }
+  }
+  return classicSVG(piece);
+}
+
+/* --- Zeichen-Studio --- */
+let cv,ctx,drawing=false,tool='draw',color='#000000',undoStack=[];
+const COLORS=['#000000','#ffffff','#e53935','#fb8c00','#fdd835','#43a047','#1e88e5','#8e24aa','#6d4c41'];
+function initCanvas(){
+  cv=document.getElementById('cv');ctx=cv.getContext('2d');ctx.lineCap='round';ctx.lineJoin='round';
+  const sw=document.getElementById('swatches');
+  COLORS.forEach(c=>{
+    const b=document.createElement('button');b.className='sw';b.style.background=c;
+    b.onclick=()=>{setColor(c);document.getElementById('col').value=c};
+    sw.appendChild(b);
+  });
+  setColor(color);
+  const pos=e=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*cv.width/r.width,y:(e.clientY-r.top)*cv.height/r.height}};
+  const stroke=(a,b)=>{
+    ctx.globalCompositeOperation=tool==='erase'?'destination-out':'source-over';
+    ctx.strokeStyle=color;
+    ctx.lineWidth=+document.getElementById('size').value*(cv.width/400)*1.6;
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  };
+  let last=null;
+  cv.addEventListener('pointerdown',e=>{
+    e.preventDefault();cv.setPointerCapture(e.pointerId);
+    pushUndo();drawing=true;last=pos(e);stroke(last,{x:last.x+.01,y:last.y});
+  });
+  cv.addEventListener('pointermove',e=>{
+    if(!drawing)return;e.preventDefault();
+    const p=pos(e);stroke(last,p);last=p;
+  });
+  const end=()=>{drawing=false};
+  cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+}
+function setColor(c){
+  color=c;setTool('draw');
+  document.querySelectorAll('.sw').forEach(b=>b.classList.toggle('on',rgb2hex(b.style.background)===c));
+}
+function rgb2hex(s){const m=s.match(/\d+/g);return m?'#'+m.slice(0,3).map(n=>(+n).toString(16).padStart(2,'0')).join(''):s}
+function setTool(t){
+  tool=t;
+  document.getElementById('t-draw').classList.toggle('on',t==='draw');
+  document.getElementById('t-erase').classList.toggle('on',t==='erase');
+}
+function pushUndo(){undoStack.push(ctx.getImageData(0,0,cv.width,cv.height));if(undoStack.length>30)undoStack.shift()}
+function undo(){const d=undoStack.pop();if(d){ctx.globalCompositeOperation='source-over';ctx.putImageData(d,0,0)}}
+function clearCv(){pushUndo();ctx.clearRect(0,0,cv.width,cv.height)}
+function curKey(){
+  const t=document.getElementById('sp').value;
+  return document.getElementById('sd').value==='w'?t.toUpperCase():t;
+}
+function loadSketch(){
+  ctx.globalCompositeOperation='source-over';
+  ctx.clearRect(0,0,cv.width,cv.height);undoStack=[];
+  const src=sketches[curKey()];
+  if(src){const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,cv.width,cv.height);img.src=src}
+}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(sketches))}catch(e){}}
+function saveSketch(){
+  sketches[curKey()]=cv.toDataURL('image/png');persist();
+  pieceStyle='custom';document.getElementById('style').value='custom';renderBoard();
+  const b=event.target;const t=b.textContent;b.textContent='✔ GESPEICHERT';setTimeout(()=>b.textContent=t,1200);
+}
+function removeSketch(){
+  delete sketches[curKey()];persist();loadSketch();renderBoard();
+}
+function openModal(id){
+  document.getElementById(id).classList.add('open');
+  if(id==='studio'){if(!cv)initCanvas();loadSketch()}
+}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+function saveSettings(){
+  document.getElementById('name-w').innerText=document.getElementById('in-w').value.toUpperCase();
+  document.getElementById('name-b').innerText=document.getElementById('in-b').value.toUpperCase();
+  mode=document.getElementById('mode').value;
+  pieceStyle=document.getElementById('style').value;
+  timeW=timeB=(parseInt(document.getElementById('in-time').value)||5)*60;
+  inc=parseInt(document.getElementById('in-inc').value)||0;
+  closeModal('settings');startGame();
+}
+window.onload=()=>{
+  try{const s=localStorage.getItem(KEY);if(s)sketches=JSON.parse(s)||{}}catch(e){}
+  initBoard();updateTimer();
+};
+</script>
+</body>
+</html>
