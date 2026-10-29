@@ -115,7 +115,7 @@ input[type=range]{flex:1;min-width:120px}
 
 <script>
 let board=[],turn='w',sel=null,moves=[],active=false,timer=null,timeW=300,timeB=300,inc=3,mode='ai',pieceStyle='classic';
-let capW=[],capB=[],sketches={};
+let capW=[],capB=[],sketches={},moved=new Set();
 const START=['rnbqkbnr','pppppppp','........','........','........','........','PPPPPPPP','RNBQKBNR'];
 const GLYPH={p:'♟',n:'♞',b:'♝',r:'♜',q:'♛',k:'♚'};
 const KEY='manga_chess_sketches_v2';
@@ -123,7 +123,7 @@ const isW=p=>p===p.toUpperCase();
 
 function initBoard(){
   board=START.map(r=>[...r].map(c=>c==='.'?'':c));
-  turn='w';sel=null;moves=[];capW=[];capB=[];
+  turn='w';sel=null;moves=[];capW=[];capB=[];moved=new Set();
   updateCaptured();updateActive();renderBoard();
 }
 function renderBoard(){
@@ -157,6 +157,11 @@ function execMove(fr,fc,tr,tc){
     }
   }
   board[tr][tc]=a;board[fr][fc]='';
+  moved.add(fr+','+fc);moved.add(tr+','+tc);
+  if(a.toLowerCase()==='k'&&fr===tr&&Math.abs(tc-fc)===2){
+    const rf=tc>fc?7:0,rt=tc>fc?5:3;
+    board[tr][rt]=board[tr][rf];board[tr][rf]='';moved.add(tr+','+rf);
+  }
   if(a==='P'&&tr===0)board[tr][tc]='Q';
   if(a==='p'&&tr===7)board[tr][tc]='q';
   if(turn==='w')timeW+=inc;else timeB+=inc;
@@ -164,7 +169,7 @@ function execMove(fr,fc,tr,tc){
   updateActive();renderBoard();
   if(mode==='ai'&&turn==='b'&&active)setTimeout(aiMove,600);
 }
-function validMoves(r,c,st){
+function validMoves(r,c,st,noCastle){
   const p=st[r][c];if(!p)return[];
   const w=isW(p),t=p.toLowerCase(),out=[];
   const enemy=x=>x&&(w?x===x.toLowerCase():x===x.toUpperCase());
@@ -179,6 +184,7 @@ function validMoves(r,c,st){
     }
     [-1,1].forEach(dc=>{if(inb(r+d,c+dc)&&enemy(st[r+d][c+dc]))out.push({r:r+d,c:c+dc})});
   }else if(t==='n'||t==='k'){
+    if(t==='k'&&!noCastle)castleMoves(r,c,st,w,out);
     (t==='n'?N:[...R,...B]).forEach(([dr,dc])=>{
       const nr=r+dr,nc=c+dc;
       if(inb(nr,nc)&&(st[nr][nc]===''||enemy(st[nr][nc])))out.push({r:nr,c:nc});
@@ -194,6 +200,29 @@ function validMoves(r,c,st){
     });
   }
   return out;
+}
+/* --- Rochade --- */
+function isAttacked(r,c,byWhite,st){
+  for(let pr=0;pr<8;pr++)for(let pc=0;pc<8;pc++){
+    const p=st[pr][pc];
+    if(!p||isW(p)!==byWhite)continue;
+    if(p.toLowerCase()==='p'){
+      const d=byWhite?-1:1;
+      if(pr+d===r&&Math.abs(pc-c)===1)return true;
+    }else if(validMoves(pr,pc,st,true).some(m=>m.r===r&&m.c===c))return true;
+  }
+  return false;
+}
+function castleMoves(r,c,st,w,out){
+  const row=w?7:0;
+  if(r!==row||c!==4||moved.has(row+',4')||isAttacked(row,4,!w,st))return;
+  const rook=w?'R':'r';
+  [[7,[5,6],[5,6],6],[0,[1,2,3],[3,2],2]].forEach(([rc,empty,safe,to])=>{
+    if(st[row][rc]!==rook||moved.has(row+','+rc))return;
+    if(empty.some(x=>st[row][x]!==''))return;
+    if(safe.some(x=>isAttacked(row,x,!w,st)))return;
+    out.push({r:row,c:to});
+  });
 }
 function aiMove(){
   if(!active)return;
